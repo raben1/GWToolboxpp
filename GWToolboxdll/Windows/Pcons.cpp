@@ -598,7 +598,8 @@ void PconGeneric::OnButtonClick()
         const std::vector<std::vector<DWORD>> categories{
             {ItemID::ConsEssence, ItemID::ConsGrail, ItemID::ConsArmor},
             {ItemID::GRC, ItemID::BRC, ItemID::RRC},
-            {ItemID::Kabobs, ItemID::PahnaiSalad, ItemID::SkalefinSoup}
+            {ItemID::Kabobs, ItemID::PahnaiSalad, ItemID::SkalefinSoup},
+            {ItemID::Pies, ItemID::Cupcakes, ItemID::Apples, ItemID::Corns, ItemID::Eggs, ItemID::Warsupplies}
         };
         const auto found = r::find_if(categories, [this](const auto& category) {
             return r::find(category, itemID) != r::end(category);

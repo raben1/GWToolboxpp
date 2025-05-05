@@ -885,7 +885,7 @@ void PconsWindow::DrawSettingsInternal()
     ImGui::NextSpacedElement();
     ImGui::Checkbox("Shift + Click toggles category", &shift_click_toggles_category);
     ImGui::ShowHelp("If this is ticked, clicking on a pcon while holding shift will enable/disable all of the same category\n"
-        "Categories: Conset, Rock Candies, Kabob+Soup+Salad");
+        "Categories: Conset, Rock Candies, Kabob+Soup+Salad, Pie+Cupcake+Apple+Corn+Egg+Warsup");
     ImGui::NextSpacedElement();
     ImGui::Checkbox("Show Enable/Disable button", &show_enable_button);
     ImGui::NextSpacedElement();
