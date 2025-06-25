@@ -105,7 +105,11 @@ namespace GW {
         bool GetMapWorldMapBounds(GW::AreaInfo* map, ImRect* out);
 
         void PingCompass(const GW::GamePos& position);
-    }
+    } // namespace Map
+    namespace LoginMgr {
+        const bool IsCharSelectReady();
+        const bool SelectCharacterToPlay(const wchar_t* name, bool play = true);
+    } // namespace LoginMgr
     namespace PartyMgr {
         GW::PlayerPartyMemberArray* GetPartyPlayers(uint32_t party_id = 0);
         size_t GetPlayerPartyIndex(uint32_t player_number, uint32_t party_id = 0);
@@ -128,7 +132,9 @@ namespace GW {
         bool GetPersonalDir(std::wstring& out);
     }
     namespace UI {
+        struct Frame;
         void AsyncDecodeStr(const wchar_t* enc_str, std::wstring* out, GW::Constants::Language language_id = (GW::Constants::Language)0xff);
+        bool BelongsToFrame(GW::UI::Frame* parent, GW::UI::Frame* child);
     }
     namespace Agents {
         void AsyncGetAgentName(const Agent* agent, std::wstring& out);

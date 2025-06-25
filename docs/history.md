@@ -7,7 +7,36 @@ layout: default
 Previous releases are available on Github as dll files. There is no support for older releases. If you are looking for
 the latest version, go to the [Home Page](./) instead.
 
-## Version 7.4
+## Version 7.11
+* [Fix] Rebased code fixes for June update to fix bugs
+* [Fix] Fixed bug preventing hero builds from loading
+* [Fix] Fixed bug preventing quest log double click to trave feature
+
+## Version 7.9
+* [Fix] Compatibility with Guild Wars after the 17.06.2025 update
+
+## Version 7.8
+* [Fix] Fixed trade alerts no longer working
+* [Fix] Fixed bug preventing player speech bubbles from showing
+* [Fix] Fixed crash in npc voice module when processing some speech bubbles in explorable areas
+* [Fix] Fixed bug causing updater to get stuck on "checking"
+* [Fix] Fixed crash when whispering an offline player with "redirect whispers" enabled
+* [Fix] Fixed /fps command not working after gw update
+* [Fix] Fixed "trade whole stacks by default" not working after gw update
+* [Fix] Fixed issues interacting with world map widgets after gw update
+* [Minor] NPC voice module checks dialog volume to avoid sending API requests when its off
+* [Minor] Char sort order preference is no longer being messed with when rerolling or auto-login via toolbox
+
+## Version 7.7
+* [Fix] Fixed crash when talking to some faction donation NPCs
+* [Fix] Fixed hanging on toolbox launch caused by poor internet connection
+* [Minor] Added a set of default toolbox window module buttons; previously only showed settings when launching toolbox for the first ever time
+* [New] Added option to armory module to globally dye armor pieces
+* [New] Added Google and Play.ht API options to NPC voice module
+
+## Version 7.6
+* [Fix] Fixed gw sometimes crashing when toolbox is closed
+* [Fix] Fixed bug with nicholas item info not always being correct
 * [Fix] Fixed GW's built in 180 fps limit to allow higher framerates (up to your fastest monitors max refresh rate)
 * [Fix] Fixed enter mission "are you sure" popup not automatically proceeding when triggered from an NPC dialog button
 * [Fix] Fixed item price being shown twice when hovering materials
@@ -20,10 +49,13 @@ the latest version, go to the [Home Page](./) instead.
 * [Fix] prompt if mission is already completed no longer causes crash in some situations in Nightfall
 * [Fix] Fixed a bug causing filtered trade chat messages to show up
 * [Fix] Fixed crash when running send chat hotkey whilst chat is focussed
+* [Fix] Fixed bug preventing the new miniatures from being flagged as collected in completion window
 * [Minor] Updated pcon settings ui
 * [Minor] Vastly improved regex performance, watch out for bugs though
 * [Minor] Added "skills offered" section to target info
-* [Minor] Improved TargetInfo window performance, 
+* [Minor] Improved TargetInfo window performance
+* [Minor] Unlock all option now affects all widgets too
+* [Minor] Added a warning message in chat if toolbox is launched in a pvp area
 * [New] ChatSettings: setting to hide all friendly speech bubbles
 * [New] /pref command now supports 'textlanguage' and 'audiolanguage'
 * [New] TargetInfo window now has a setting to automatically hide if no suitable target is selected
@@ -32,6 +64,9 @@ the latest version, go to the [Home Page](./) instead.
 * [New] Setting not to draw toolbox during loading screens
 * [New] Game world quest path can now be shown independently from Minimap (settings for it are still in Minimap settings)
 * [New] /spawnblockeditems to spawn all items the Item Filter settings currently have blocked
+* [New] /config chat command - see help > chat commands
+* [New] Added Hero Equipment module - an inventory icon is shown in the title bar of a hero skill bar
+* [New] Added NPC Voice module - add an API key in settings > NPC Voice to enable in-game text to speech
 
 ## Version 7.3
 * [Fix] Fix keys being stuck when you hold them as you open an imgui modal

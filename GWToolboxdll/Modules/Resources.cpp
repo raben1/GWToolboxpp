@@ -184,6 +184,8 @@ namespace {
         r->SetVerifyPeer(false); // idc about mitm or out of date certs
         r->SetMethod(HttpMethod::Get);
         r->SetVerifyHost(false);
+        r->SetConnectTimeoutSec(5);
+        r->SetTimeoutSec(10);
     }
 
     const std::string HashStr(const std::string& str)
@@ -505,7 +507,7 @@ std::filesystem::path Resources::GetPath(const std::filesystem::path& folder, co
 
 bool Resources::EnsureFolderExists(const std::filesystem::path& path)
 {
-    return exists(path) || create_directory(path);
+    return exists(path) || create_directories(path);
 }
 
 bool Resources::Download(const std::filesystem::path& path_to_file, const std::string& url, std::wstring& response)

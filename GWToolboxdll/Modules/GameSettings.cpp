@@ -222,6 +222,8 @@ namespace {
 
     bool is_prompting_hard_mode_mission = false;
 
+    bool add_agent_id_to_enemy_names = false;
+
     GW::HookEntry SkillList_UICallback_HookEntry;
     GW::UI::UIInteractionCallback SkillList_UICallback_Func = 0, SkillList_UICallback_Ret = 0;
 
@@ -229,7 +231,7 @@ namespace {
     void OnSkillList_UICallback(GW::UI::InteractionMessage* message, void* wParam, void* lParam)
     {
         GW::Hook::EnterHook();
-        const auto is_show_unlearned_skill = message->message_id == (GW::UI::UIMessage)0x47 && ((uint32_t*)wParam)[1] == 0x3;
+        const auto is_show_unlearned_skill = message->message_id == GW::UI::UIMessage::kFrameMessage_0x47 && ((uint32_t*)wParam)[1] == 0x3;
         if (!(is_show_unlearned_skill && show_unlearned_skill)) {
             SkillList_UICallback_Ret(message, wParam, lParam);
         }
@@ -481,7 +483,7 @@ namespace {
     void __fastcall OnSetFrameSkillDescription(SetFrameSkillDescriptionParam* param)
     {
         GW::Hook::EnterHook();
-        constexpr auto frame_set_text_ui_message = static_cast<GW::UI::UIMessage>(0x52);
+        constexpr auto frame_set_text_ui_message = GW::UI::UIMessage::kFrameMessage_0x52;
         const auto frame = GW::UI::GetChildFrame(GW::UI::GetFrameById(param->frame_id), 0xb);
         bool block_description = disable_skill_descriptions_in_outpost && IsOutpost() || disable_skill_descriptions_in_explorable && IsExplorable();
         block_description = block_description && GetKeyState(modifier_key_item_descriptions) >= 0;
@@ -493,6 +495,7 @@ namespace {
         // Add a catch to grab the encoded text back out
         static std::wstring encoded_text_set;
         static GW::UI::UIInteractionCallback prev_callback = 0;
+        prev_callback = 0;
         if (frame && frame->frame_callbacks.size()) {
             prev_callback = frame->frame_callbacks[0].callback;
             frame->frame_callbacks[0].callback = [](GW::UI::InteractionMessage* message, void* wParam, void* lParam) {
@@ -1166,6 +1169,8 @@ namespace {
     }
 
     GW::HookEntry OnPreUIMessage_HookEntry;
+    
+    bool need_to_hide_inventory_window_after_trade = false;
 
     void OnPreUIMessage(GW::HookStatus* status, GW::UI::UIMessage message_id, void* wParam, void*)
     {
@@ -1199,6 +1204,13 @@ namespace {
                 }
             }
             break;
+            case GW::UI::UIMessage::kTradeSessionStart: {
+                // TODO: This only catches the scenario where the trade window is shown straight away (i.e. player initiates trade)
+                // If another player trades you, this ui message will show the trade "prompt" window and won't show inv until you click "view"
+                // 
+                // Probably need to hook into CreateFloatingWindow and block it if the inv window is trying to be opened without user interaction
+                need_to_hide_inventory_window_after_trade = GW::UI::GetFrameByLabel(L"Inventory") == nullptr;
+            } break;
         }
     }
 
@@ -1258,7 +1270,7 @@ namespace {
         if (!name_input) return;
         const auto agent_enc_name = GW::PlayerMgr::GetPlayerName();
         // Prefill and hide the name input
-        GW::UI::SendFrameUIMessage(name_input, (GW::UI::UIMessage)0x4e, (void*)agent_enc_name);
+        GW::UI::SendFrameUIMessage(name_input, GW::UI::UIMessage::kFrameMessage_0x4e, (void*)agent_enc_name);
         GW::UI::SetFrameVisible(name_input, 0);
         // Show and enable the "Sign" button
         GW::UI::SetFrameDisabled(sign_btn, 0);
@@ -1277,7 +1289,6 @@ namespace {
     }
 
     GW::HookEntry OnPostUIMessage_HookEntry;
-
 
     void OnPostUIMessage(GW::HookStatus* status, GW::UI::UIMessage message_id, void* wParam, void*)
     {
@@ -1304,6 +1315,9 @@ namespace {
                 }
                 if (focus_window_on_trade) {
                     FocusWindow();
+                }
+                if (need_to_hide_inventory_window_after_trade) {
+                    GW::UI::DestroyUIComponent(GW::UI::GetFrameByLabel(L"Inventory"));
                 }
             }
             break;
@@ -1353,8 +1367,8 @@ namespace {
             break;
             case GW::UI::UIMessage::kDialogButton: {
                 OnDialogButton((GW::UI::DialogButtonInfo*)wParam);
-            }
-            break;
+            } break;
+            
         }
     }
 
@@ -1742,7 +1756,8 @@ void GameSettings::Initialize()
         GW::UI::UIMessage::kSendCallTarget,
         GW::UI::UIMessage::kVanquishComplete,
         GW::UI::UIMessage::kSendDialog,
-        GW::UI::UIMessage::kMapLoaded
+        GW::UI::UIMessage::kMapLoaded, 
+        GW::UI::UIMessage::kTradeSessionStart
     };
     for (const auto message_id : pre_ui_messages) {
         RegisterUIMessageCallback(&OnPreUIMessage_HookEntry, message_id, OnPreUIMessage, -0x8000);

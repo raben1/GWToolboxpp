@@ -55,12 +55,15 @@
 #include <Modules/DialogModule.h>
 #include <Modules/GwDatTextureModule.h>
 #include <Modules/HallOfMonumentsModule.h>
+#include <Modules/AudioSettings.h>
 #include <Modules/Resources.h>
 #include <Utils/ToolboxUtils.h>
 #include <Logger.h>
 #include <GWToolbox.h>
 #include <Utils/TextUtils.h>
 #include <GWCA/Context/GameplayContext.h>
+#include <GWCA/Context/CharContext.h>
+#include <Utils/ArenaNetFileParser.h>
 
 namespace {
 
@@ -436,13 +439,15 @@ namespace {
                 ImGui::PushID("npc_info");
                 InfoField("Addr", "%p", npc);
                 InfoField("NPC ID", "%d", npc_id);
-                InfoField("NPC ModelFileID", "0x%X", npc->model_file_id);
+                InfoField("NPC Model File ID", "0x%X", npc->model_file_id);
+                InfoField("NPC Skin File ID", "0x%X", npc->skin_file_id);
+                InfoField("NPC Adjustment", "0x%X", npc->visual_adjustment);
+                InfoField("NPC Appearance", "0x%X", npc->appearance);
                 if (npc->files_count) {
                     InfoField("NPC ModelFile", "0x%X", npc->model_files[0]);
                 }
                 InfoField("NPC Flags", "0x%X", npc->npc_flags);
                 EncInfoField("NPC Name", npc->name_enc);
-                InfoField("NPC Scale", "0x%X", npc->scale);
                 ImGui::PopID();
             }
             const auto map_agent = GW::Agents::GetMapAgentByID(agent->agent_id);
@@ -560,11 +565,7 @@ namespace {
         GW::Hook::LeaveHook();
         return res;
     }
-    void FileIdToFileHash(uint32_t file_id, wchar_t* fileHash) {
-        fileHash[0] = static_cast<wchar_t>(((file_id - 1) % 0xff00) + 0x100);
-        fileHash[1] = static_cast<wchar_t>(((file_id - 1) / 0xff00) + 0x100);
-        fileHash[2] = 0;
-    }
+
 
     uint32_t FileHashToFileId(wchar_t* param_1) {
         if (!param_1)
@@ -668,6 +669,8 @@ namespace {
         GW::Hook::LeaveHook();
     }
 
+
+
     void PostDraw() {
         HookOnCreateTexture(record_textures);
         HookOnValidateAsyncDecodeStr(record_enc_strings);
@@ -678,7 +681,7 @@ namespace {
         if (!(prop && prop->h0034[4]))
             return 0;
         uint32_t* sub_deets = (uint32_t*)prop->h0034[4];
-        return GwDatTextureModule::FileHashToFileId((wchar_t*)sub_deets[1]);
+        return ArenaNetFileParser::FileHashToFileId((wchar_t*)sub_deets[1]);
     };
     void DrawDebugInfo() {
         if (!SetFpsLimits_Func) {
@@ -745,7 +748,7 @@ namespace {
                 ImGui::ImageButton(*texture, scaled_size, uv0, uv1, -1, normal_bg, tint);
                 if (ImGui::IsItemHovered()) {
                     static wchar_t out[3];
-                    FileIdToFileHash(texture_file_ids[texture], out);
+                    ArenaNetFileParser::FileIdToFileHash(texture_file_ids[texture], out);
                     ImGui::SetTooltip("File ID: 0x%08x\nFile Hash: 0x%04x 0x%04x", texture_file_ids[texture], out[0], out[1]);
                 }
                 ImGui::PopID();
@@ -820,6 +823,13 @@ namespace {
                 ImGui::Unindent();
             }
         }
+        if (ImGui::Button("Open Text Dev Window")) {
+            GW::GameThread::Enqueue([] {
+                GW::GetCharContext()->player_flags |= 0x8;
+                GW::UI::Keypress((GW::UI::ControlAction)0x25);
+                GW::GetCharContext()->player_flags ^= 0x8;
+            });
+        }
 
 
         // For debugging changes to flags/arrays etc
@@ -849,29 +859,9 @@ namespace {
         [[maybe_unused]] const auto secondary = ac ? ac->secondary() : 0;
         [[maybe_unused]] const auto salvage_session = GW::Items::GetSalvageSessionInfo();
 #ifdef _DEBUG
-        //auto frame = GW::UI::GetChildFrame(GW::UI::GetFrameByLabel(L"DeckBuilder"), 1);
-        //HighlightFrame(frame);
+        auto frame = GW::UI::GetChildFrame(GW::UI::GetFrameByLabel(L"Vendor"), 0,0,2);
+        HighlightFrame(frame); 
 
-        auto frame = GW::UI::GetFrameByLabel(L"Vendor");
-        auto tab_frame = (GW::TabsFrame*)GW::UI::GetChildFrame(frame, 0);
-        uint32_t tab_index = 0;
-        tab_frame->GetCurrentTabIndex(&tab_index);
-        uint32_t tab_frame_id = 0;
-        tab_frame->GetTabFrameId(tab_index, &tab_frame_id);
-        auto tab = GW::UI::GetFrameById(tab_frame_id);
-        auto tab_context = GW::UI::GetFrameContext(tab);
-
-        auto tab_btn = tab ? (GW::ButtonFrame*)GW::UI::GetChildFrame(tab_frame, ~(tab->child_offset_id))
-                              : nullptr;
-
-        const wchar_t* label = nullptr;
-        if (tab_btn) {
-            tab_btn->GetLabel(&label);
-        }
-
-        // TODO: tab_context not working - find the name of the button!
-        HighlightFrame(tab);
-        (tab_context, label);
 #endif
     }
 }

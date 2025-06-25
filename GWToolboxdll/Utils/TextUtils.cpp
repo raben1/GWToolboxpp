@@ -118,6 +118,12 @@ namespace TextUtils {
         return s;
     }
 
+
+    std::wstring StripTags(std::wstring_view str)
+    {
+        return ctre_regex_replace<L"<[^>]+>", L"">(str);
+    }
+
     std::string HtmlEncode(const std::string_view s)
     {
         if (s.empty()) {
@@ -303,6 +309,28 @@ namespace TextUtils {
             if (c == L'\\') c = L'/';
         }
         return path;
+    }
+
+    std::string Base64Decode(std::string_view encoded)
+    {
+        const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string decoded;
+        std::vector<int> T(256, -1);
+
+        for (int i = 0; i < 64; i++)
+            T[chars[i]] = i;
+
+        int val = 0, valb = -8;
+        for (unsigned char c : encoded) {
+            if (T[c] == -1) break;
+            val = (val << 6) + T[c];
+            valb += 6;
+            if (valb >= 0) {
+                decoded.push_back(char((val >> valb) & 0xFF));
+                valb -= 8;
+            }
+        }
+        return decoded;
     }
 
     std::wstring RemoveDiacritics(const std::wstring_view s)
@@ -551,14 +579,27 @@ namespace TextUtils {
     std::string rtrim(const std::string& s, const char* t)
     {
         auto cpy = s;
-        cpy.erase(s.find_last_not_of(t) + 1);
+        const auto found = s.find_last_not_of(t);
+        if (found == std::string::npos) {
+            cpy.clear();
+        }
+        else {
+            cpy.erase(found + 1);
+        }
         return cpy;
     }
 
     std::string ltrim(const std::string& s, const char* t)
     {
         auto cpy = s;
-        cpy.erase(0, s.find_first_not_of(t));
+        const auto found = s.find_first_not_of(t);
+        if (found == std::string::npos) {
+            cpy.clear();
+        }
+        else {
+            cpy.erase(0, found);
+        }
+
         return cpy;
     }
 

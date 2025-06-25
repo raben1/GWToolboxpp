@@ -43,6 +43,12 @@ namespace {
     {
         return item && item->info_string && wcschr(item->info_string, 0xAC9);
     }
+
+    GW::UI::Frame* GetSelectorFrame()
+    {
+        return GW::UI::GetFrameByLabel(L"Selector");
+    }
+
 }
 
 namespace GW {
@@ -102,7 +108,34 @@ namespace GW {
             const auto p = m ? m->props : nullptr;
             return p ? &p->propArray : nullptr;
         }
+    } // namespace Map
+    namespace LoginMgr {
+        const bool IsCharSelectReady() {
+            return GW::UI::GetFrameContext(GetSelectorFrame());
+        }
+
+        const bool SelectCharacterToPlay(const wchar_t* name, bool play)
+        {
+            const auto selector = GetSelectorFrame();
+            if (!(selector && GW::UI::GetFrameContext(selector))) return false;
+
+            if (!AccountMgr::GetAvailableCharacter(name)) return false;
+            GW::UI::UIPacket::kMouseAction action{};
+            action.frame_id = selector->frame_id;
+            action.child_offset_id = selector->child_offset_id;
+            struct button_param {
+                const wchar_t* name;
+                uint32_t play;
+            };
+            button_param wparam = {name, 0u}; // NB: We'll explicitly play in a bit
+            action.wparam = &wparam;
+            action.current_state = 0x7;
+            if (!GW::UI::SendFrameUIMessage(GW::UI::GetParentFrame(selector), GW::UI::UIMessage::kMouseClick2, &action)) 
+                return false;
+            return (!play || GW::UI::ButtonClick(GW::UI::GetFrameByLabel(L"Play")));
+        }
     }
+
 
     namespace PartyMgr {
         GW::PlayerPartyMemberArray* GetPartyPlayers(uint32_t party_id)
@@ -155,11 +188,16 @@ namespace GW {
     namespace AccountMgr {
         GW::Array<AvailableCharacterInfo>* GetAvailableChars()
         {
-            if (available_chars_ptr)
-                return available_chars_ptr;
-            const uintptr_t address = GW::Scanner::Find("\x8b\x35\x00\x00\x00\x00\x57\x69\xF8\x84\x00\x00\x00", "xx????xxxxxxx", 0x2);
-            ASSERT(address);
-            available_chars_ptr = *(GW::Array<AvailableCharacterInfo>**)address;
+            if (!available_chars_ptr) {
+                const auto address = GW::Scanner::Find("\x8b\x35\x00\x00\x00\x00\x57\x69\xF8\x84\x00\x00\x00", "xx????xxxxxxx", 0x2);
+#ifdef _DEBUG
+                ASSERT(address);
+#endif
+                if (address) {
+                    available_chars_ptr = *(GW::Array<AvailableCharacterInfo>**)address;
+                }
+
+            }
             return available_chars_ptr;
         }
 
@@ -215,6 +253,15 @@ namespace GW {
             AsyncDecodeStr(enc_str, [](void* param, const wchar_t* s) {
                 *(std::wstring*)param = s;
             }, out, language_id);
+        }
+        bool BelongsToFrame(GW::UI::Frame* parent, GW::UI::Frame* child) {
+            while (child && parent) {
+                if (child == parent) {
+                    return true;
+                }
+                child = GetParentFrame(child);
+            }
+            return false;
         }
     }
 

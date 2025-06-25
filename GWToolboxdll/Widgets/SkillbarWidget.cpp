@@ -49,7 +49,7 @@ namespace {
 
     // Skill overlay settings
     bool display_skill_overlay = true;
-    float font_recharge = 20.f;
+    float font_recharge = 64.f;
     Color color_text_recharge = Colors::White();
     Color color_text_outline = 0;
     Color color_border = Colors::ARGB(100, 255, 255, 255);
@@ -72,20 +72,20 @@ namespace {
 
     GW::UI::Frame* skillbar_frame = nullptr;
     bool skillbar_position_dirty = true;
-    GW::UI::UIInteractionCallback OnSkillbar_UICallback_Ret = nullptr;
+    GW::UI::UIInteractionCallback OnSkillbar_UICallback_Ret = 0, OnSkillbar_UICallback_Func = 0;
 
     void __cdecl OnSkillbar_UICallback(GW::UI::InteractionMessage* message, void* wParam, void* lParam)
     {
         GW::Hook::EnterHook();
         OnSkillbar_UICallback_Ret(message, wParam, lParam);
-        switch (static_cast<uint32_t>(message->message_id)) {
-            case 0xb:
+        switch (message->message_id) {
+            case GW::UI::UIMessage::kDestroyFrame:
                 skillbar_frame = nullptr;
                 skillbar_position_dirty = true;
                 break;
-            case 0x13:
-            case 0x30:
-            case 0x33:
+            case GW::UI::UIMessage::kFrameMessage_0x13:
+            case GW::UI::UIMessage::kRenderFrame_0x30:
+            case GW::UI::UIMessage::kSetLayout:
                 skillbar_position_dirty = true; // Forces a recalculation
                 break;
         }
@@ -99,9 +99,10 @@ namespace {
         skillbar_frame = GW::UI::GetFrameByLabel(L"Skillbar");
         if (skillbar_frame) {
             ASSERT(skillbar_frame->frame_callbacks.size());
-            if (skillbar_frame->frame_callbacks[0].callback != OnSkillbar_UICallback) {
-                OnSkillbar_UICallback_Ret = skillbar_frame->frame_callbacks[0].callback;
-                skillbar_frame->frame_callbacks[0].callback = OnSkillbar_UICallback;
+            if (!OnSkillbar_UICallback_Func) {
+                OnSkillbar_UICallback_Func = skillbar_frame->frame_callbacks[0].callback;
+                GW::Hook::CreateHook((void**)&OnSkillbar_UICallback_Func, OnSkillbar_UICallback, reinterpret_cast<void**>(&OnSkillbar_UICallback_Ret));
+                GW::Hook::EnableHooks(OnSkillbar_UICallback_Func);
             }
         }
         return skillbar_frame;
@@ -641,9 +642,11 @@ void SkillbarWidget::Terminate()
     ToolboxWidget::Terminate();
     GW::UI::RemoveUIMessageCallback(&OnUIMessage_HookEntry);
 
-    if (skillbar_frame && skillbar_frame->frame_callbacks[0].callback == OnSkillbar_UICallback) {
-        skillbar_frame->frame_callbacks[0].callback = OnSkillbar_UICallback_Ret;
+    if (OnSkillbar_UICallback_Func) {
+        GW::Hook::RemoveHook(OnSkillbar_UICallback_Func);
+        OnSkillbar_UICallback_Func = nullptr;
     }
+
     ChatCommands::RemoveSettingChatCommand(L"skillbar_effects_overlay");
     ChatCommands::RemoveSettingChatCommand(L"skillbar_skills_overlay");
 }

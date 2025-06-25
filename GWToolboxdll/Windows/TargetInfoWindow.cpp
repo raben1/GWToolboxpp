@@ -24,11 +24,14 @@ namespace {
     // Make sure you pass valid html e.g. start with a < tag
     std::string& strip_tags(std::string& html)
     {
-        while (const auto startpos = html.find("<") != std::string::npos) {
-            const auto endpos = html.find(">", startpos) + 1;
+
+        while(true) {
+            const auto startpos = html.find('<');
+            if (startpos == std::string::npos) break;
+            const auto endpos = html.find('>', startpos);
             if (endpos == std::string::npos)
                 break;
-            html.erase(startpos, endpos - startpos);
+            html.erase(startpos, (endpos + 1) - startpos);
         }
 
         return html;
@@ -37,7 +40,7 @@ namespace {
     std::string& from_html(std::string& html)
     {
         strip_tags(html);
-        TextUtils::trim(html);
+        html = TextUtils::trim(html);
         return html;
     }
 
@@ -214,23 +217,48 @@ namespace {
 
     std::unordered_map<std::wstring, AgentInfo*> agent_info_by_name;
 
+    void ClearAgentInfo()
+    {
+        loop:
+        for (auto& agent_info : agent_info_by_name) {
+            if (agent_info.second->state != AgentInfo::TargetInfoState::Done) continue;
+            delete agent_info.second;
+            agent_info_by_name.erase(agent_info.first);
+            goto loop;
+        }
+    }
+
     AgentInfo* current_agent_info = nullptr;
 
     GW::HookEntry ui_message_entry;
 
-    void OnUIMessage(GW::HookStatus*, GW::UI::UIMessage, void*, void*)
+    void OnUIMessage(GW::HookStatus*, GW::UI::UIMessage message_id, void*, void*)
     {
-        const auto info_target = GW::Agents::GetTarget();
-        if (!(info_target && info_target->GetIsLivingType() && info_target->GetAsAgentLiving()->IsNPC()))
-            return;
-        const auto name = GW::Agents::GetAgentEncName(info_target);
-        if (!(name && *name))
-            return;
-        if (!agent_info_by_name.contains(name)) {
-            const auto agent_info = new AgentInfo(name);
-            agent_info_by_name[name] = agent_info;
+        switch (message_id) {
+            case GW::UI::UIMessage::kChangeTarget: {
+                current_agent_info = nullptr;
+                const auto info_target = GW::Agents::GetTarget();
+                const wchar_t* name = nullptr;
+                if (info_target && info_target->GetIsLivingType() && info_target->GetAsAgentLiving()->IsNPC()) {
+                    name = GW::Agents::GetAgentEncName(info_target);
+                }
+                if (info_target && info_target->GetIsGadgetType()) {
+                    name = GW::Agents::GetAgentEncName(info_target);
+                }
+                if (!(name && *name)) return;
+                if (!agent_info_by_name.contains(name)) {
+                    const auto agent_info = new AgentInfo(name);
+                    agent_info_by_name[name] = agent_info;
+                }
+                current_agent_info = agent_info_by_name[name];
+                break;
+            }
+            case GW::UI::UIMessage::kMapLoaded: {
+                current_agent_info = nullptr;
+                ClearAgentInfo();
+                break;
+            }
         }
-        current_agent_info = agent_info_by_name[name];
     }
 
     bool SkillNamesDecoded()
@@ -314,6 +342,7 @@ void TargetInfoWindow::Initialize()
 void TargetInfoWindow::Terminate()
 {
     ToolboxWindow::Terminate();
+    ClearAgentInfo();
     GW::UI::RemoveUIMessageCallback(&ui_message_entry);
 }
 

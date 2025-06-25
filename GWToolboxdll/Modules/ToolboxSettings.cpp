@@ -36,6 +36,9 @@
 #include <Modules/CodeOptimiserModule.h>
 #include <Modules/VendorFix.h>
 #include <Modules/AudioSettings.h>
+#include <Modules/HeroEquipmentModule.h>
+#include <Modules/NPCVoiceModule.h>
+#include <Modules/LoginModule.h>
 
 #include <Windows/PconsWindow.h>
 #include <Windows/HotkeysWindow.h>
@@ -152,23 +155,25 @@ namespace {
         ResignLogModule::Instance(),
         QuestModule::Instance(),
         PartyBroadcast::Instance(),
-        CodeOptimiserModule::Instance(), 
-#if _DEBUG
+        CodeOptimiserModule::Instance(),
+#if 0
         ExtraWeaponSets::Instance(),
 #endif
+        LoginModule::Instance(),
+        NPCVoiceModule::Instance(),
         AudioSettings::Instance()
     };
 
     std::vector<WidgetToggle> optional_widgets = {
         TimerWidget::Instance(),
         HealthWidget::Instance(),
-        SkillbarWidget::Instance(),
-        DistanceWidget::Instance(),
+        SkillbarWidget::Instance(), 
+        {DistanceWidget::Instance(), false},
         Minimap::Instance(),
-        PartyDamage::Instance(),
-        BondsWidget::Instance(),
-        ClockWidget::Instance(),
-        VanquishWidget::Instance(),
+        {PartyDamage::Instance(), false}, 
+        {BondsWidget::Instance(), false}, 
+        {ClockWidget::Instance(), false},
+        {VanquishWidget::Instance(), false},
         AlcoholWidget::Instance(),
         WorldMapWidget::Instance(),
         EffectsMonitorWidget::Instance(),
@@ -178,6 +183,7 @@ namespace {
 #if _DEBUG
         InventoryOverlayWidget::Instance(),
 #endif
+        {HeroEquipmentModule::Instance(), false},
         ActiveQuestWidget::Instance(),
 
     };

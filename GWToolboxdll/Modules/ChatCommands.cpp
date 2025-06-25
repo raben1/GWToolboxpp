@@ -413,9 +413,9 @@ namespace {
         // Find value and set preference
         uint32_t value = 0xff;
         if (argc > 2 && TextUtils::ParseUInt(argv[2], &value)) {
-            GW::GameThread::Enqueue([pref, value] {
+            GW::GameThread::Enqueue([pref, value, pref_str = std::wstring(argv[1])] {
                 if (!GW::UI::SetPreference(pref, value)) {
-                    Log::Error("Failed to set preference %d to %d", std::to_underlying(pref), value);
+                    Log::ErrorW(L"Failed to set preference %s to %d", pref_str.c_str(), value);
                 }
             });
             return;
@@ -437,9 +437,9 @@ namespace {
         // Find value and set preference
         uint32_t value = 0xff;
         if (argc > 2 && TextUtils::ParseUInt(argv[2], &value)) {
-            GW::GameThread::Enqueue([pref, value] {
+            GW::GameThread::Enqueue([pref, value, pref_str = std::wstring(argv[1])] {
                 if (!GW::UI::SetPreference(pref, value)) {
-                    Log::Error("Failed to set preference %d to %d", std::to_underlying(pref), value);
+                    Log::ErrorW(L"Failed to set preference %s to %d", pref_str.c_str(), value);
                 }
             });
             return;
@@ -484,7 +484,6 @@ namespace {
         Log::InfoW(L"Current preference value for %s is %d", argv[1], GetPreference(pref));
     }
 
-
     class PrefLabel : public GuiUtils::EncString {
     public:
         PrefLabel(const wchar_t* _enc_string = nullptr)
@@ -516,6 +515,7 @@ namespace {
     }
 
     struct PrefMapCommand {
+
         PrefMapCommand(GW::UI::EnumPreference p, uint32_t enc_string_id)
             : preference_id(std::to_underlying(p))
         {
@@ -556,6 +556,8 @@ namespace {
     {
         if (pref_map.empty()) {
             pref_map = {
+                {GW::UI::FlagPreference::WaitForVSync, GW::EncStrings::VerticalSync},
+                {GW::UI::NumberPreference::FullscreenGamma, GW::EncStrings::FullScreenGamma},
                 {GW::UI::EnumPreference::AntiAliasing, GW::EncStrings::AntiAliasing},
                 {GW::UI::EnumPreference::ShaderQuality, GW::EncStrings::ShaderQuality},
                 {GW::UI::EnumPreference::TerrainQuality, GW::EncStrings::TerrainQuality},
@@ -565,11 +567,13 @@ namespace {
                 {GW::UI::NumberPreference::TextureQuality, GW::EncStrings::TextureQuality},
                 {GW::UI::NumberPreference::TextLanguage, GW::EncStrings::TextLanguage},
                 {GW::UI::NumberPreference::AudioLanguage, GW::EncStrings::AudioLanguage},
+                {GW::UI::NumberPreference::ClockMode, GW::EncStrings::InGameClock},
                 {GW::UI::FlagPreference::ChannelAlliance, GW::EncStrings::ChannelAlliance},
                 {GW::UI::FlagPreference::ChannelGuild, GW::EncStrings::ChannelGuild},
                 {GW::UI::FlagPreference::ChannelGroup, GW::EncStrings::ChannelTeam},
                 {GW::UI::FlagPreference::ChannelEmotes, GW::EncStrings::ChannelEmotes},
                 {GW::UI::FlagPreference::ChannelTrade, GW::EncStrings::ChannelTrade},
+                {GW::UI::NumberPreference::MasterVolume, GW::EncStrings::MasterVolume},
                 {GW::UI::NumberPreference::MusicVolume, GW::EncStrings::MusicVolume},
                 {GW::UI::FlagPreference::DisableMouseWalking, GW::EncStrings::DisableMouseWalking},
                 {GW::UI::FlagPreference::AlwaysShowFoeNames, L"\x108\x107Show Foe Names\x1"},
@@ -695,6 +699,118 @@ namespace {
         GW::UI::SendUIMessage(GW::UI::UIMessage::kSendCallTarget, &call_packet);
     }
 
+    void CHAT_CMD_FUNC(CmdConfig)
+    {
+        const char* syntax = "/config set|get|toggle|load [section key [value]]...";
+        if (argc < 4) {
+            Log::Error(syntax);
+            return;
+        }
+        auto modules = GWToolbox::GetAllModules();
+        ToolboxIni empty_ini;
+        auto ini_disk = GWToolbox::OpenSettingsFile();
+        enum ActionType : uint8_t { Set, Get, Toggle, Load } action = Set;
+
+        const auto arg1 = TextUtils::ToLower(argv[1]);
+        if (arg1 == L"set") {
+            action = Set;
+        }
+        else if (arg1 == L"get") {
+            action = Get;
+        }
+        else if (arg1 == L"toggle") {
+            action = Toggle;
+        }
+        else if (arg1 == L"load") {
+            action = Load;
+        }
+        else {
+            Log::Error(syntax);
+            return;
+        }
+        // make sure the loop will not run out of arguments mid tuple
+        switch (action) {
+            case Set:
+            case Toggle:
+                if (argc % 3 != 2) {
+                    Log::Error(syntax);
+                    return;
+                }
+                break;
+            case Get:
+            case Load:
+                if (argc % 2 != 0) {
+                    Log::Error(syntax);
+                    return;
+                }
+                break;
+        }
+
+        // merge supplied settings with currently applied ini sections
+        for (int i = 2; i < argc;) {
+            const auto section = TextUtils::UcWords(TextUtils::WStringToString(argv[i]));
+            i++;
+
+            ASSERT(i < argc);
+            const auto key = TextUtils::ToLower(TextUtils::WStringToString(argv[i]));
+            i++;
+
+            std::string value;
+            if (action == Set || action == Toggle) {
+                ASSERT(i < argc);
+                value = TextUtils::WStringToString(argv[i]);
+                i++;
+            }
+            // add sections only for modules referred to in this command
+            if (!empty_ini.SectionExists(section.c_str())) {
+                for (const auto m : modules) {
+                    if (section == m->Name()) {
+                        m->SaveSettings(&empty_ini);
+                        break;
+                    }
+                }
+            }
+            if (!empty_ini.SectionExists(section.c_str())) {
+                Log::Warning("ignoring unknown section '%s'", section.c_str());
+                continue;
+            }
+            if (!empty_ini.KeyExists(section.c_str(), key.c_str())) {
+                Log::Warning("ignoring unknown key '%s'", key.c_str());
+                continue;
+            }
+            switch (action) {
+                case Set:
+                    empty_ini.SetValue(section.c_str(), key.c_str(), value.c_str());
+                    break;
+                case Get:
+                    Log::Info("[%s] %s = %s", section.c_str(), key.c_str(), empty_ini.GetValue(section.c_str(), key.c_str()));
+                    break;
+                case Toggle:
+                    // Wouldn't this feature behave differently once you save the settings???
+                    // e.g. "/config toggle Pcons show_enable_button false" suddenly wouldn't work if it was saved as "false" when you closed toolbox...
+                    if (0 == strcmp(empty_ini.GetValue(section.c_str(), key.c_str()), ini_disk->GetValue(section.c_str(), key.c_str(), value.c_str()))) {
+                        empty_ini.SetValue(section.c_str(), key.c_str(), value.c_str());
+                    }
+                    else {
+                        empty_ini.SetValue(section.c_str(), key.c_str(), ini_disk->GetValue(section.c_str(), key.c_str(), value.c_str()));
+                    }
+                    break;
+                case Load:
+                    empty_ini.SetValue(section.c_str(), key.c_str(), ini_disk->GetValue(section.c_str(), key.c_str(), value.c_str()));
+            }
+        }
+
+        if (action == Get) {
+            return;
+        }
+        // apply sections which were affected by this command
+        for (const auto m : modules) {
+            if (empty_ini.SectionExists(m->Name())) {
+                m->LoadSettings(&empty_ini);
+            }
+        }
+    }
+
     std::vector<std::pair<const wchar_t*, GW::Chat::ChatCommandCallback>> chat_commands;
 
     const wchar_t* settings_via_chat_commands_cmd = L"tb_setting";
@@ -801,10 +917,18 @@ namespace {
         ImGui::Bullet();
         ImGui::Text("'/chest' opens xunlai in outposts.");
         ImGui::Bullet();
+        ImGui::Text("'/config set|get|toggle|load [section key [value]]...' edit configuration values from GWToolbox.ini.\n"
+                    "\t'set' apply a setting to the running configuration.\n"
+                    "\t'get' show value of given key.\n"
+                    "\t'toggle' alternate between given value and configuration on disk.\n"
+                    "\t'load' reset key to its disk configuration.");
+        ImGui::Bullet();
         ImGui::Text("'/damage' or '/dmg' to print party damage to chat.\n"
             "'/damage me' sends your own damage only.\n"
             "'/damage <number>' sends the damage of a party member (e.g. '/damage 3').\n"
             "'/damage reset' resets the damage in party window.");
+        ImGui::Bullet();
+        ImGui::Text(deposit_syntax);
         ImGui::Bullet();
         ImGui::Text("'/dialog <id>' sends a dialog id to the current NPC you're talking to.\n"
             "'/dailog take' automatically takes the first available quest/reward from the NPC you're talking to.");
@@ -822,6 +946,11 @@ namespace {
         ImGui::Text("'/flag <number> clear' to clear flag for a hero.");
         ImGui::Bullet();
         ImGui::Text(fps_syntax);
+        if (GWToolbox::IsModuleEnabled("Hero Equipment")) {
+            ImGui::Bullet();
+            ImGui::Text("'/heroinventory [hero_index]' to toggle separate inventory windows for a hero");
+        }
+
         ImGui::Bullet();
         ImGui::Text("'/hero [avoid|guard|attack|target] [hero_index]' to set your hero behavior or target in an explorable area.\n"
             "If hero_index is not provided, all heroes behaviours will be adjusted.");
@@ -914,8 +1043,8 @@ namespace {
         ImGui::Text("'/wiki [quest|<search_term>]' search GWW for current quest or search term. By default, will search for the current map.");
         ImGui::Bullet();
         ImGui::Text(withdraw_syntax);
-        ImGui::Bullet();
-        ImGui::Text(deposit_syntax);
+
+
 
         ImGui::TreePop();
     }
@@ -1011,18 +1140,18 @@ void ChatCommands::TransmoAgent(DWORD agent_id, PendingTransmo& transmo)
         GW::NPC npc = {0};
         npc.model_file_id = npc_model_file_id;
         npc.npc_flags = flags;
-        npc.primary = 1;
-        npc.scale = scale;
+        npc.primary = (GW::Constants::Profession)1;
+        npc.visual_adjustment = *(GW::CharAdjustment*)(&scale);
         npc.default_level = 0;
         GW::GameThread::Enqueue([npc_id, npc] {
             GW::Packet::StoC::NpcGeneralStats packet{};
             packet.npc_id = npc_id;
             packet.file_id = npc.model_file_id;
             packet.data1 = 0;
-            packet.scale = npc.scale;
+            packet.scale = *(uint32_t*)(&npc.visual_adjustment);
             packet.data2 = 0;
             packet.flags = npc.npc_flags;
-            packet.profession = npc.primary;
+            packet.profession = (uint32_t)npc.primary;
             packet.level = npc.default_level;
             packet.name[0] = 0;
             GW::StoC::EmulatePacket(&packet);
@@ -1324,6 +1453,7 @@ void ChatCommands::Initialize()
         {L"fps", CmdFps},
         {L"pref", CmdPref},
         {L"call", CmdCallTarget},
+        {L"config", CmdConfig},
         {settings_via_chat_commands_cmd, CmdSettingViaChatCommand}
     };
 
@@ -1943,7 +2073,7 @@ void CHAT_CMD_FUNC(ChatCommands::CmdTB)
         const auto file_location = GWToolbox::SaveSettings();
         const auto dir = file_location.parent_path();
         const auto dirstr = dir.wstring();
-        const auto printable = TextUtils::str_replace_all(dirstr, LR"(\\)", L"/");
+        const auto printable = TextUtils::str_replace_all(dirstr, LR"(\)", L"/");
         Log::InfoW(L"Settings saved to %s", printable.c_str());
     }
     else if (arg1 == L"load") {
@@ -1959,7 +2089,7 @@ void CHAT_CMD_FUNC(ChatCommands::CmdTB)
         const auto file_location = GWToolbox::LoadSettings();
         const auto dir = file_location.parent_path();
         const auto dirstr = dir.wstring();
-        const auto printable = TextUtils::str_replace_all(dirstr, LR"(\\)", L"/");
+        const auto printable = TextUtils::str_replace_all(dirstr, LR"(\)", L"/");
         Log::InfoW(L"Settings loaded from %s", printable.c_str());
     }
     else {
