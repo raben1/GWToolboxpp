@@ -298,6 +298,7 @@ namespace GW {
         static const uint32_t InvertMouseControlOfCamera = 0x572;
         static const uint32_t ShowAllyNpcAndItemNames = 0x5c4;
         static const uint32_t ShowFoeNames = 0x5c6;
+        static const uint32_t DoNotShowSkillTipsOnSkillBars = 0xd746;
         // ...
 
         // Graphics settings
